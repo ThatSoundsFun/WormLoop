@@ -4,7 +4,7 @@ from copy import copy, deepcopy
 from random import randrange
 from collections import deque
 
-dead_color = (240,240,240)
+dead_color = (230,230,230)
 
 class Worm:
 	list = []
@@ -18,16 +18,15 @@ class Worm:
 		
 	def first_init(*parameters):
 		#prevents the worm from initializing again after start
-		print(len(Worm.list))
 		if len(Worm.list) == 0:
 			Worm.init(*parameters)
 		
 		
 	def __init__(self, body, gene, color):
-		self.body = body
-		self.body_length = len(body)
-		self.gene = gene
-		self.color = color
+		self.body   = body
+		self.length = len(body)
+		self.gene   = gene
+		self.color  = color
 		
 		self.age = 0
 		self.is_dead = False
@@ -45,7 +44,7 @@ class Worm:
 	def write_worm_info(self, log_file):
 		#appends info about dying worm to file 
 		gene  = self.rotated_marker()
-		body  = str(self.body_length)
+		body  = str(self.length)
 		color = '{} {} {}'.format(str(self.color[0]).zfill(3), str(self.color[1]).zfill(3), str(self.color[2]).zfill(3))
 		age   = str(self.age)
 		tick  = Game.tick
@@ -67,25 +66,34 @@ class Worm:
 			gene.rotate(1)
 		return ''.join(gene).replace('x','') 
 
-	def check_collision():
+	def check_collision(width, height, unit):
 		for worm1 in Worm.list:
 			for worm2 in Worm.list:
 				#body[0][1:] is the head of the worm without the direction string
 				#body[1:] is the worm excluding head
 				
-				for part in worm2.body[1:]:
-					if worm1.body[0][1:] == part[1:]:
+				for segment in worm2.body[1:]:
+					if worm1.body[0][1:] == segment[1:]:
 						#collision with body excluding head
 						worm1.is_dead = True
+						worm1.grey_out(unit)
 						break
 					
 				if worm1.body[0][1:] == worm2.body[0][1:] and worm1 is not worm2:
 					#collision with head
 					worm1.is_dead = True
+					worm1.grey_out(unit)
 					
 				if worm1.body[0][1] < 0 or worm1.body[0][1] >= width or worm1.body[0][2] < 0 or worm1.body[0][2] >= height:
 					#collision with boundary
 					worm1.is_dead = True
+					worm1.grey_out(unit)
+					
+	def grey_out(self, unit):
+		if Game.toggle_render == True:
+			for segment in self.body:
+				pygame.draw.rect(Game.screen, dead_color, (segment[1], segment[2], unit, unit))
+				pygame.display.update(segment[1], segment[2], unit, unit)
 					
 	def start_replication():
 		for worm1 in Worm.list:
@@ -99,18 +107,51 @@ class Worm:
 				
 	def can_replicate(sunlight_chance):
 		for worm1 in Worm.list:
-			for worm1_part in worm1.body:
-				if worm1_part[0] == 'north' and Worm.can_get_sunlight(worm1_part) == True and int(randrange(0,sunlight_chance)) == 0:
+			for worm1_segment in worm1.body:
+				if worm1_segment[0] == 'north' and Worm.can_get_sunlight(worm1_segment) == True and int(randrange(0,sunlight_chance)) == 0:
 					worm1.will_replicate = True
 					break
+					
 				
-	def can_get_sunlight(worm1_part):
+	def can_get_sunlight(worm1_segment):
+		#checks if no other worm is blocking this worm segment for sunlight
 		for worm2 in Worm.list:
-			for worm2_part in worm2.body:
-				if worm1_part[1] < worm2_part[1] and worm1_part[2] == worm2_part[2]:
-
+			for worm2_segment in worm2.body:
+				if worm1_segment[1] < worm2_segment[1] and worm1_segment[2] == worm2_segment[2]:
 					return False
 		return True	
+			
+			
+	def move_worm(unit):
+		#every single tail must be updated first before the heads
+		#todo: maybe move the update part to a seperate function
+		for self in Worm.list:
+			self.update_tail(unit)
+				
+		for self in Worm.list:
+			if self.is_dead == False:
+				self.body.insert(0, self.body[0].copy())
+				if self.body[0][0] == 'north':
+					self.body[0][2] -= unit
+				elif self.body[0][0] == 'south':
+					self.body[0][2] += unit
+				elif self.body[0][0] == 'west':
+					self.body[0][1] -= unit
+				elif self.body[0][0] == 'east':
+					self.body[0][1] += unit
+				self.update_head(unit)
+				
+			del self.body[-1]
+
+	def update_head(self, unit):
+		if Game.toggle_render == True:
+			pygame.draw.rect(Game.screen, self.color, (self.body[0][1],self.body[0][2] , unit, unit))
+			pygame.display.update(self.body[0][1],self.body[0][2], unit, unit)
+		
+	def update_tail(self, unit):
+		if Game.toggle_render == True:
+			pygame.draw.rect(Game.screen, (255,255,255), (self.body[-1][1],self.body[-1][2], unit, unit))
+			pygame.display.update(self.body[-1][1],self.body[-1][2], unit, unit)
 		
 	def change_direction(self):
 		if self.is_dead == False and self.will_replicate == False:
@@ -144,24 +185,11 @@ class Worm:
 		if self.will_replicate == False:
 			self.gene.rotate(1)
 			if self.gene[0] == 'x':
+				#'x' is a marker and must be ignored 
 				self.gene.rotate(1)
-		
-	def move_snake(self, unit):
-		if self.is_dead == False:
-			self.body.insert(0, self.body[0].copy())
-			if self.body[0][0] == 'north':
-				self.body[0][2] -= unit
-			elif self.body[0][0] == 'south':
-				self.body[0][2] += unit
-			elif self.body[0][0] == 'west':
-				self.body[0][1] -= unit
-			elif self.body[0][0] == 'east':
-				self.body[0][1] += unit
-				
-		del self.body[-1]
-					
-	def mutation(self, mutation_chance):
-		if int(randrange(0,1000)) == 0:
+	
+	def mutation(self, mutation_chance, unit):
+		if int(randrange(0,mutation_chance)) == 0:
 			type = int(randrange(0,6))
 			if type == 0:
 				self.mutation_add_turn_gene()
@@ -174,7 +202,7 @@ class Worm:
 			elif type == 4:
 				self.mutation_add_body_length()
 			elif type == 5:
-				self.mutation_remove_body_length()
+				self.mutation_remove_body_length(unit)
 					
 	def mutation_add_turn_gene(self):
 		turn_type = int(randrange(0,2))
@@ -204,44 +232,23 @@ class Worm:
 	
 	def mutation_add_body_length(self):
 		self.body.append(['south',-10,-10])
-		self.body_length += 1
+		self.length += 1
 		
-	def mutation_remove_body_length(self):
+	def mutation_remove_body_length(self, unit):
 		if len(self.body) > 1:
-			self.body_length -= 1
+			self.length -= 1
+			self.update_tail(unit)
 			del self.body[-1]
 			
 	def new_color(self):
-		color = bin(randrange(0,63)).replace('0b', '').zfill(6)
+		#Red must not go above 200 or else the worm can become white or light grey which are the colors of the background and dying worms.
+		#There are 64 possible colors a worm can be.
+		red   = randrange(0,4) * 65
+		green = randrange(0,4) * 85
+		blue  = randrange(0,4) * 85
 		
-		red   = color[0:2]
-		green = color[2:4]
-		blue  = color[4:6]
+		self.color = [red, green, blue]		
 		
-		#red must not go above 200 or else the worm can become white or light grey which are the colors of the background and dying worms
-		red   = int(red,2)  * 60	
-		green = int(blue,2) * 80
-		blue  = int(blue,2) * 80
-		
-		self.color = [red, green, blue]
-				
-		if all([c >= 200 for c in self.color]) == True:
-			#this prevents the worm from becoming white or light grey, which the background and dead worm uses.
-			self.color = [150,150,150]
-			self.new_color()
-			
-			
-	def display(self, unit):
-		if Game.toggle_render == True:
-			if self.is_dead == False:
-				#colors it normally if it didn't die.
-				for part in self.body:
-					pygame.draw.rect(screen, self.color, [part[1], part[2], unit, unit])
-			else:
-				#colors it gray if it did die.
-				for part in self.body:
-					pygame.draw.rect(screen, dead_color, [part[1], part[2], unit, unit])
-					
 	def debug(self):
 		print(self.body)
 	
