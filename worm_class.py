@@ -108,7 +108,7 @@ class Worm:
 	def can_replicate(sunlight_chance):
 		for worm1 in Worm.list:
 			for worm1_segment in worm1.body:
-				if worm1_segment[0] == 'north' and Worm.can_get_sunlight(worm1_segment) == True and int(randrange(0,sunlight_chance)) == 0:
+				if worm1_segment[0] == 'north' and int(randrange(0,sunlight_chance)) == 0 and Worm.can_get_sunlight(worm1_segment) == True:
 					worm1.will_replicate = True
 					break
 					
