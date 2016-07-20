@@ -1,5 +1,5 @@
-import pickle
 import pygame
+import json
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -22,11 +22,13 @@ class Game:
 	def load_from_file(file, *default):
 		#if no data is found, then it will return default instead
 		try:
-			with open(file,'rb') as f:
-				return pickle.load(f)
-		except:
-			pass
-		return default
+			with open(file,'r') as f:
+				return json.load(f)
+		except(FileNotFoundError):
+			with open(file, 'w') as f:
+				return default
+		except(ValueError):
+			return default
 	
 	def events():
 		for event in pygame.event.get():
@@ -40,10 +42,10 @@ class Game:
 					Game.toggle_render = True
 					Game.clear_screen()
 			
-	def dump_save(file, *input):
+	def dump_save(file, *data):
 		print('Saving To file...')
-		with open(file,'wb') as file:
-			pickle.dump(input, file)
+		with open(file,'w') as file:
+			json.dump(data, file, sort_keys=True, indent=1)
 		print('Done')
 		
 	def tick_add(max_fps):

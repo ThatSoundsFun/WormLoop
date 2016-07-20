@@ -2,35 +2,39 @@ import pygame
 from game_class import *
 from copy import copy, deepcopy
 from random import randrange
-from collections import deque
 
 dead_color = (230,230,230)
 
 class Worm:
 	list = []
 	
-	def init(body, gene, color):
+	def to_obj(list):
+		#converts dictionaries from json to objects
+		for dict in list:
+			Worm.init(dict)
+			
+	def first_init(body, gene, color):
+		#prevents the worm from initializing again after start
+		if len(Worm.list) == 0:
+			index = Worm.init({})
+			worm = Worm.list[index]
+			worm.body           = body
+			worm.gene           = gene
+			worm.color          = color
+			worm.length         = len(body)
+			worm.age            = 0
+			worm.will_replicate = False
+			worm.is_dead        = False
+			
+	def init(entries):
 		#registers the worm to list before actually initializes it
 		index = len(Worm.list)
 		Worm.list.append(None)
-		Worm.list[-1] = Worm(deepcopy(body), copy(gene), copy(color))
+		Worm.list[-1] = Worm(entries)
 		return index
-		
-	def first_init(*parameters):
-		#prevents the worm from initializing again after start
-		if len(Worm.list) == 0:
-			Worm.init(*parameters)
-		
-		
-	def __init__(self, body, gene, color):
-		self.body   = body
-		self.length = len(body)
-		self.gene   = gene
-		self.color  = color
-		
-		self.age = 0
-		self.is_dead = False
-		self.will_replicate = False
+			
+	def __init__(self, entries):
+		self.__dict__ = entries
 			
 	def clean_list(log_file):
 		Worm.list[:] = [worm for worm in Worm.list if worm.is_completely_gone(log_file) == False]
@@ -63,31 +67,55 @@ class Worm:
 		#This is so the same species of worm can easily be identified in the file.
 		gene = copy(self.gene)
 		while gene[-1] != 'x':
-			gene.rotate(1)
+			tmp = gene.pop()
+			gene.insert(0,tmp)
 		return ''.join(gene).replace('x','') 
 
 	def check_collision(width, height, unit):
 		for worm1 in Worm.list:
-			for worm2 in Worm.list:
-				#body[0][1:] is the head of the worm without the direction string
-				#body[1:] is the worm excluding head
-				
-				for segment in worm2.body[1:]:
-					if worm1.body[0][1:] == segment[1:]:
-						#collision with body excluding head
+			if worm1.is_dead == False:
+				for worm2 in Worm.list:
+					#body[0][1:] is the head of the worm without the direction string
+					#body[1:] is the worm excluding head
+					
+					if worm1.head_to_head(worm2) == True:
+						worm1.is_dead = True
+						worm2.is_dead = True
+						worm1.grey_out(unit)
+						worm2.grey_out(unit)
+						break
+					
+					if worm1.head_to_body(worm2) == True:
 						worm1.is_dead = True
 						worm1.grey_out(unit)
 						break
-					
-				if worm1.body[0][1:] == worm2.body[0][1:] and worm1 is not worm2:
-					#collision with head
-					worm1.is_dead = True
-					worm1.grey_out(unit)
-					
-				if worm1.body[0][1] < 0 or worm1.body[0][1] >= width or worm1.body[0][2] < 0 or worm1.body[0][2] >= height:
+						
+				if worm1.head_to_wall(width, height) == True:
 					#collision with boundary
 					worm1.is_dead = True
 					worm1.grey_out(unit)
+					
+	def head_to_head(self, worm2):
+		if self.body[0][1:] == worm2.body[0][1:] and self is not worm2:
+			return True
+		return False
+					
+	def head_to_body(self, worm2):
+		for segment in worm2.body[1:]:
+			if self.body[0][1:] == segment[1:]:
+				return True
+		return False
+		
+	def head_to_wall(self, width, height):
+		if   self.body[0][1] < 0:
+			return True
+		elif self.body[0][2] < 0:
+			return True 
+		elif self.body[0][1] >= width:
+			return True
+		elif self.body[0][2] >= height:
+			return True
+		return False
 					
 	def grey_out(self, unit):
 		if Game.toggle_render == True:
@@ -98,11 +126,19 @@ class Worm:
 	def start_replication():
 		for worm1 in Worm.list:
 			if worm1.will_replicate == True and worm1.is_dead == False:
-				worm2 = Worm.list[Worm.init(worm1.body, worm1.gene, worm1.color)]
-				direction = worm1.body[0][0]
-				worm1.body[0][0] = Worm.left_turn_table(direction)
-				worm2.body[0][0] = Worm.right_turn_table(direction)
-				worm1.age = 0
+				index = Worm.init({'body'          : deepcopy(worm1.body),
+								   'gene'          : copy(worm1.gene),
+								   'color'         : copy(worm1.color),
+								   'length'        : len(worm1.body),
+								   'age'           : 0,
+								   'is_dead'       : False,
+								   'will_replicate': False})
+								   
+				worm2                = Worm.list[index]
+				direction            = worm1.body[0][0]
+				worm1.body[0][0]     = Worm.left_turn_table(direction)
+				worm2.body[0][0]     = Worm.right_turn_table(direction)
+				worm1.age            = 0
 				worm1.will_replicate = False
 				
 	def can_replicate(sunlight_chance):
@@ -183,10 +219,12 @@ class Worm:
 			
 	def rotate_gene(self):
 		if self.will_replicate == False:
-			self.gene.rotate(1)
+			tmp = self.gene.pop()
+			self.gene.insert(0,tmp)
 			if self.gene[0] == 'x':
 				#'x' is a marker and must be ignored 
-				self.gene.rotate(1)
+				tmp = self.gene.pop()
+				self.gene.insert(0,tmp)
 	
 	def mutation(self, mutation_chance, unit):
 		if int(randrange(0,mutation_chance)) == 0:
@@ -247,8 +285,12 @@ class Worm:
 		green = randrange(0,4) * 85
 		blue  = randrange(0,4) * 85
 		
-		self.color = [red, green, blue]		
+		self.color = [red, green, blue]
+		
+	def to_dict():
+		#converts objects from Worm.list to dictionaries so it can be dumped to json
+		return [worm.__dict__ for worm in Worm.list]
 		
 	def debug(self):
-		print(self.body)
+		print()
 	
