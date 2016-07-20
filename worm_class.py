@@ -1,5 +1,4 @@
 import pygame
-from game_class import *
 from copy import copy, deepcopy
 from random import randrange
 
@@ -8,8 +7,8 @@ dead_color = (230,230,230)
 class Worm:
 	list = []
 	
-	def to_obj(list):
-		#converts dictionaries from json to objects
+	def json_init(list):
+		#initializes worms that was stored from json
 		for dict in list:
 			Worm.init(dict)
 			
@@ -36,22 +35,21 @@ class Worm:
 	def __init__(self, entries):
 		self.__dict__ = entries
 			
-	def clean_list(log_file):
-		Worm.list[:] = [worm for worm in Worm.list if worm.is_completely_gone(log_file) == False]
+	def clean_list(log_file, tick):
+		Worm.list[:] = [worm for worm in Worm.list if worm.is_completely_gone(log_file, tick) == False]
 		
-	def is_completely_gone(self, log_file):
+	def is_completely_gone(self, log_file, tick):
 		if self.is_dead == True and len(self.body) == 0:
-			self.write_worm_info(log_file)
+			self.write_worm_info(log_file, tick)
 			return True
 		return False
 		
-	def write_worm_info(self, log_file):
+	def write_worm_info(self, log_file, tick):
 		#appends info about dying worm to file 
-		gene  = self.rotated_marker()
+		gene  = self.pretty_print_gene()
 		body  = str(self.length)
 		color = '{} {} {}'.format(str(self.color[0]).zfill(3), str(self.color[1]).zfill(3), str(self.color[2]).zfill(3))
-		age   = str(self.age)
-		tick  = Game.tick
+		age   = str(self.age).zfill(3)
 		
 		space1 = abs(20 - len(gene))  * ' '
 		space2 = abs(5  - len(body))  * ' '
@@ -62,16 +60,15 @@ class Worm:
 		with open(log_file, 'a') as file:
 			file.write(text)
 				
-	def rotated_marker(self):
-		#Returns the worms gene in string form with the marker rotated to the end.
-		#This is so the same species of worm can easily be identified in the file.
+	def pretty_print_gene(self):
+		#returns the gene in string form and with marker shifted to the end
 		gene = copy(self.gene)
 		while gene[-1] != 'x':
 			tmp = gene.pop()
 			gene.insert(0,tmp)
 		return ''.join(gene).replace('x','') 
 
-	def check_collision(width, height, unit):
+	def check_collision(width, height, update_var):
 		for worm1 in Worm.list:
 			if worm1.is_dead == False:
 				for worm2 in Worm.list:
@@ -81,19 +78,19 @@ class Worm:
 					if worm1.head_to_head(worm2) == True:
 						worm1.is_dead = True
 						worm2.is_dead = True
-						worm1.grey_out(unit)
-						worm2.grey_out(unit)
+						worm1.grey_out(*update_var)
+						worm2.grey_out(*update_var)
 						break
 					
 					if worm1.head_to_body(worm2) == True:
 						worm1.is_dead = True
-						worm1.grey_out(unit)
+						worm1.grey_out(*update_var)
 						break
 						
 				if worm1.head_to_wall(width, height) == True:
 					#collision with boundary
 					worm1.is_dead = True
-					worm1.grey_out(unit)
+					worm1.grey_out(*update_var)
 					
 	def head_to_head(self, worm2):
 		if self.body[0][1:] == worm2.body[0][1:] and self is not worm2:
@@ -117,10 +114,10 @@ class Worm:
 			return True
 		return False
 					
-	def grey_out(self, unit):
-		if Game.toggle_render == True:
+	def grey_out(self, unit, toggle, screen):
+		if toggle == True:
 			for segment in self.body:
-				pygame.draw.rect(Game.screen, dead_color, (segment[1], segment[2], unit, unit))
+				pygame.draw.rect(screen, dead_color, (segment[1], segment[2], unit, unit))
 				pygame.display.update(segment[1], segment[2], unit, unit)
 					
 	def start_replication():
@@ -158,11 +155,11 @@ class Worm:
 		return True	
 			
 			
-	def move_worm(unit):
+	def move_worm(unit, update_var):
 		#every single tail must be updated first before the heads
 		#todo: maybe move the update part to a seperate function
 		for self in Worm.list:
-			self.update_tail(unit)
+			self.update_tail(*update_var)
 				
 		for self in Worm.list:
 			if self.is_dead == False:
@@ -175,18 +172,18 @@ class Worm:
 					self.body[0][1] -= unit
 				elif self.body[0][0] == 'east':
 					self.body[0][1] += unit
-				self.update_head(unit)
+				self.update_head(*update_var)
 				
 			del self.body[-1]
 
-	def update_head(self, unit):
-		if Game.toggle_render == True:
-			pygame.draw.rect(Game.screen, self.color, (self.body[0][1],self.body[0][2] , unit, unit))
+	def update_head(self, unit, toggle, screen):
+		if toggle == True:
+			pygame.draw.rect(screen, self.color, (self.body[0][1],self.body[0][2] , unit, unit))
 			pygame.display.update(self.body[0][1],self.body[0][2], unit, unit)
 		
-	def update_tail(self, unit):
-		if Game.toggle_render == True:
-			pygame.draw.rect(Game.screen, (255,255,255), (self.body[-1][1],self.body[-1][2], unit, unit))
+	def update_tail(self, unit, toggle, screen):
+		if toggle == True:
+			pygame.draw.rect(screen, (255,255,255), (self.body[-1][1],self.body[-1][2], unit, unit))
 			pygame.display.update(self.body[-1][1],self.body[-1][2], unit, unit)
 		
 	def change_direction(self):
@@ -226,13 +223,15 @@ class Worm:
 				tmp = self.gene.pop()
 				self.gene.insert(0,tmp)
 	
-	def mutation(self, mutation_chance, unit):
-		if int(randrange(0,mutation_chance)) == 0:
+	def mutation(self, mutation_chance, update_var):
+		if self.is_dead == False and int(randrange(0,mutation_chance)) == 0:
 			type = int(randrange(0,6))
 			if type == 0:
 				self.mutation_add_turn_gene()
+				self.new_color()
 			elif type == 1:
 				self.mutation_remove_turn_gene()
+				self.new_color()
 			elif type == 2:
 				self.mutation_add_forward_gene()
 			elif type == 3:
@@ -240,7 +239,8 @@ class Worm:
 			elif type == 4:
 				self.mutation_add_body_length()
 			elif type == 5:
-				self.mutation_remove_body_length(unit)
+				self.update_tail(*update_var)
+				self.mutation_remove_body_length()
 					
 	def mutation_add_turn_gene(self):
 		turn_type = int(randrange(0,2))
@@ -248,7 +248,6 @@ class Worm:
 			self.gene.append('l')
 		elif turn_type == 1:
 			self.gene.append('r')
-		self.new_color()
 			
 	def mutation_remove_turn_gene(self):
 		if len(self.gene) > 1:
@@ -256,7 +255,6 @@ class Worm:
 				if gene == 'l' or gene == 'r':
 					del self.gene[index]
 					break
-		self.new_color()
 				
 	def mutation_add_forward_gene(self):
 		self.gene.append('.')
@@ -272,20 +270,36 @@ class Worm:
 		self.body.append(['south',-10,-10])
 		self.length += 1
 		
-	def mutation_remove_body_length(self, unit):
+	def mutation_remove_body_length(self):
 		if len(self.body) > 1:
 			self.length -= 1
-			self.update_tail(unit)
 			del self.body[-1]
-			
+				
 	def new_color(self):
-		#Red must not go above 200 or else the worm can become white or light grey which are the colors of the background and dying worms.
+		#One of the colors must not go above 200 or else the worm can become white or light grey which are the colors of the background and dying worms.
+		#Red was chosen because the human eye can see more shades red then the other 2 colors.
 		#There are 64 possible colors a worm can be.
 		red   = randrange(0,4) * 65
 		green = randrange(0,4) * 85
 		blue  = randrange(0,4) * 85
 		
 		self.color = [red, green, blue]
+		
+	def at_click_location(click_pos, unit):
+		for self in Worm.list:
+			for segment in self.body:
+				#if any of the if statements are true, then the mouse is not clicking that worm
+				if click_pos[0] < segment[1]:
+					continue
+				if click_pos[0] > segment[1] + unit:
+					continue
+				if click_pos[1] < segment[2]:
+					continue
+				if click_pos[1] > segment[2] + unit:
+					continue
+				else:
+					return 'gene: {} length:{}'.format(self.pretty_print_gene(), self.length)
+		return 'Nothing Here'
 		
 	def to_dict():
 		#converts objects from Worm.list to dictionaries so it can be dumped to json

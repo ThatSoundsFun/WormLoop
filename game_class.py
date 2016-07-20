@@ -1,5 +1,6 @@
 import pygame
 import json
+from worm_class import *
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -30,7 +31,7 @@ class Game:
 		except(ValueError):
 			return default
 	
-	def events():
+	def events(unit):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				Game.running = False
@@ -41,6 +42,9 @@ class Game:
 				else:
 					Game.toggle_render = True
 					Game.clear_screen()
+			elif event.type == pygame.MOUSEBUTTONUP:
+				pos = pygame.mouse.get_pos()
+				print(Worm.at_click_location(pos, unit))
 			
 	def dump_save(file, *data):
 		print('Saving To file...')
