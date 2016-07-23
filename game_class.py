@@ -1,4 +1,5 @@
 import pygame
+import pickle
 import json
 from worm_class import *
 
@@ -11,7 +12,7 @@ class Game:
 	tick = 0
 	screen = None
 	
-	def init_screen(width, height):
+	def screen_init(width, height):
 		Game.screen = pygame.display.set_mode((width, height))
 		Game.screen.fill((255,255,255))
 		pygame.display.update()	
@@ -25,12 +26,26 @@ class Game:
 		try:
 			with open(file,'r') as f:
 				return json.load(f)
+		except(ValueError):
+			return Game.load_old(file, default)
 		except(FileNotFoundError):
 			with open(file, 'w') as f:
 				return default
-		except(ValueError):
-			return default
-	
+			
+	def load_old(file, default):
+		try:
+			with open(file, 'rb') as f:
+				obj_list, tick = pickle.load(f)
+				return '1.1', tick, default[2], obj_list
+		except:
+			return Game.corrupt_file_warning(default)
+			
+	def corrupt_file_warning(default):
+		print('WARNING: Save File is Corrupted. If You Continue, This File Will Get Overwritten When You Quit')
+		print('Press Enter To Continue:')
+		input()
+		return default
+		
 	def events(unit):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:

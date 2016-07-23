@@ -7,25 +7,17 @@ dead_color = (230,230,230)
 class Worm:
 	list = []
 	
-	def json_init(list):
+	def json_init(version, json_list):
 		#initializes worms that was stored from json
-		for dict in list:
-			Worm.init(dict)
-			
-	def first_init(body, gene, color):
-		#prevents the worm from initializing again after start
-		if len(Worm.list) == 0:
-			index = Worm.init({})
-			worm = Worm.list[index]
-			worm.body           = body
-			worm.gene           = gene
-			worm.color          = color
-			worm.length         = len(body)
-			worm.ancestor       = ''
-			worm.age            = 0
-			worm.will_replicate = False
-			worm.is_dead        = False
-			
+		if version == '1.1':
+			Worm.list = json_list
+			for self in Worm.list:
+				self.gene = list(self.gene)	#converts deque to list
+				self.ancestor = ''			#ancestor was added in 1.2
+		else:
+			for dict in json_list:
+				Worm.init(dict)
+		
 	def init(entries):
 		#registers the worm to list before actually initializes it
 		index = len(Worm.list)
@@ -131,15 +123,16 @@ class Worm:
 	def start_replication(self):
 		worm1 = self
 		if worm1.will_replicate == True and worm1.is_dead == False:
-			index = Worm.init({'body'          : deepcopy(worm1.body),
-							   'gene'          : copy(worm1.gene),
-							   'color'         : copy(worm1.color),
-							   'length'        : len(worm1.body),
-							   'ancestor'      : worm1.ancestor,
-							   'age'           : 0,
-							   'is_dead'       : False,
-							   'will_replicate': False})
-							   
+			index = Worm.init({
+			'body'          : deepcopy(worm1.body),
+			'gene'          : copy(worm1.gene),
+			'color'         : copy(worm1.color),
+			'length'        : len(worm1.body),
+			'ancestor'      : worm1.ancestor,
+			'age'           : 0,
+			'is_dead'       : False,
+			'will_replicate': False
+			})
 			worm2                = Worm.list[index]
 			direction            = worm1.body[0][0]
 			worm1.body[0][0]     = Worm.left_turn_table(direction)

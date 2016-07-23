@@ -1,31 +1,47 @@
 import pygame
+import time
 from worm_class import *
 from game_class import *
 from random import seed
 
-#config 
-save_file = 'wormloop-save-.json'
-log_file  = 'wormloop-log-.txt'
-max_fps = 10
+save_file = 'wormloop_save.json'
+log_file  = 'wormloop-log.txt'
+max_fps = None
 
-unit = 5
-width = 800
-height = 800
+starting_config = {
+'width'           : 800,
+'height'          : 800,
+'unit'            : 5,
+'sunlight_chance' : 10,
+'mutation_chance' : 500,
+'random_seed'     : 1
+}
 
-sunlight_chance = 10	#actual chance is 1 / value
-mutation_chance = 500	#actual chance is 1 / value
+starting_worm = [{
+'body'          : [['north', 400, 400],['south', -10, -10]],
+'gene'          : ['r','r','l','l','l','.','.','.','x'],
+'color'         : [0,0,0],
+'length'        : 2,
+'age'           : 0,
+'ancestor'      : '',
+'is_dead'       : False,
+'will_replicate': False
+}]
 
-random_seed      = 100
-starting_pattern = [['north',500,500],['south', -10, -10]], ['l','l','l','r','r','.','.','.','.','x'], [0,0,0]
+version, Game.tick, config, json_list = Game.load_from_file(save_file, '1.2', 0, starting_config, starting_worm)
 
-#end of config
-Game.init_screen(width, height)
-seed(random_seed)
-version, Game.tick, json_list = Game.load_from_file(save_file, '1.2.0', 0, [])
-Worm.json_init(json_list)
-Worm.first_init(*starting_pattern)
+width           = config['width']
+height          = config['height']
+unit            = config['unit']
+sunlight_chance = config['sunlight_chance']
+mutation_chance = config['mutation_chance']
+random_seed	    = config['random_seed']
+
+Worm.json_init(version, json_list)
+Game.screen_init(width, height)
 while Game.running == True: 
 	update_var = unit, Game.toggle_render, Game.screen	#variables used for updating the screen
+	seed(random_seed + Game.tick)
 	Worm.clean_list(log_file, Game.tick)
 	Worm.loop(Worm.check_collision, width, height, update_var) #takes up about 90% of the overall execution time
 	Worm.loop(Worm.start_replication)
@@ -41,4 +57,4 @@ while Game.running == True:
 	Game.events(unit)
 	
 pygame.quit()
-Game.dump_save(save_file, version, Game.tick, Worm.to_dict())
+Game.dump_save(save_file, '1.2', Game.tick, config, Worm.to_dict())
