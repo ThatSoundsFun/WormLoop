@@ -5,7 +5,7 @@ from random import seed
 
 save_file = 'wormloop-save.json'
 log_file  = 'wormloop-log.txt'
-max_fps = 1
+max_fps = None
 
 starting_config = {
 'width'           : 600,
