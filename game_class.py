@@ -9,7 +9,6 @@ clock = pygame.time.Clock()
 class Game:
 	running = True
 	toggle_render = True
-	tick = 0
 	screen = None
 	
 	def screen_init(width, height):
@@ -36,15 +35,25 @@ class Game:
 		try:
 			with open(file, 'rb') as f:
 				obj_list, tick = pickle.load(f)
-				return '1.1', tick, default[2], obj_list
+				Game.convert_warning()
+				config = default[2]
+				return '1.1', tick, config, obj_list
 		except:
-			return Game.corrupt_file_warning(default)
+			Game.corrupt_file_warning()
+			return default
 			
-	def corrupt_file_warning(default):
-		print('WARNING: Save File is Corrupted. If You Continue, This File Will Get Overwritten When You Quit')
+	def corrupt_file_warning():
+		print('WARNING: Save File Is Corrupted.')
+		print('If You Continue, This File Will Get Overwritten When You Quit.')
 		print('Press Enter To Continue:')
 		input()
-		return default
+		
+	def convert_warning():
+		print('WARNING: The Length Of All Worms Will Get Adjusted To Equal Their Gene Length.')
+		print('Make Sure That The Configs Are The Same And That You Backed Up Your Files')
+		print('Are You Sure You Want To Continue?')
+		print('Press Enter To Continue:')
+		input()
 		
 	def events(unit):
 		for event in pygame.event.get():
@@ -67,7 +76,6 @@ class Game:
 			json.dump(data, file, sort_keys=True, indent=1)
 		print('Done')
 		
-	def tick_add(max_fps):
-		Game.tick += 1
+	def fps(max_fps):
 		if max_fps != None:
 			clock.tick(max_fps)

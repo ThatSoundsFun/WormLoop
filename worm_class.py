@@ -11,12 +11,23 @@ class Worm:
 		#initializes worms that was stored from json
 		if version == '1.1':
 			Worm.list = json_list
-			for self in Worm.list:
-				self.gene = list(self.gene)	#converts deque to list
-				self.ancestor = ''			#ancestor was added in 1.2
+			Worm.loop(Worm.convert_old)
 		else:
 			for dict in json_list:
 				Worm.init(dict)
+				
+	def convert_old(self):
+		self.old_adjust_body()
+		self.gene = list(self.gene)	#converts deque to list
+		self.ancestor = ''			#ancestor was added in 1.2
+				
+	def old_adjust_body(self):
+		#same as adjust_body but doing it continuousely and without updating the screen
+		while len(self.body) != self.get_length():
+			if len(self.body) < self.get_length():
+				self.body.append(['south',-10,-10])
+			elif len(self.body) > self.get_length():
+				del self.body[-1]
 		
 	def init(entries):
 		#registers the worm to list before actually initializes it
@@ -40,20 +51,35 @@ class Worm:
 	def write_worm_info(self, log_file, tick):
 		#appends info about dying worm to file 
 		gene     = self.pretty_print_gene()
-		body     = str(self.length)
+		body     = str(self.get_length())
 		color    = '{} {} {}'.format(str(self.color[0]).zfill(3), str(self.color[1]).zfill(3), str(self.color[2]).zfill(3))
 		ancestor = self.ancestor
 		age      = str(self.age).zfill(3)
 		
-		space1 = abs(20 - len(gene))     * ' '
-		space2 = abs(20 - len(ancestor)) * ' '
+		space1 = abs(30 - len(gene))     * ' '
+		space2 = abs(15 - len(ancestor)) * ' '
 		space3 = abs(5  - len(body))     * ' '
 		space4 = abs(15 - len(color))    * ' '
-		space5 = abs(10 - len(age))      * ' '
+		space5 = abs(5  - len(age))      * ' '
 		
 		text = 'gene: {}{} ancestor: {}{} length: {}{} color: {}{} age: {}{} tick: {}\n'.format(gene,space1,ancestor,space2,body,space3,color,space4,age,space5,tick)
-		with open(log_file, 'a') as file:
-			file.write(text)
+		
+		Worm.write_to_file(text, log_file)
+		
+	def write_to_file(text, file, attempt=0):
+		#Occasionally I run into these errors. This will make sure the game doesn't crash after this error.
+		try:
+			with open(file, 'a') as f:
+				f.write(text)
+		except(PermissionError):
+			if attempt == 1:
+				print('Error: File Permission Denied For Unknown Reason')
+				print('Trying Again')
+			elif attempt >= 10:
+				print('Error Is Not Resolving On Its Own')
+				print('Press Enter To Try Again:')
+				input()
+			Worm.write_to_file(text, file, attempt+1)
 				
 	def pretty_print_gene(self):
 		#returns the gene in string form and with marker shifted to the end
@@ -127,7 +153,6 @@ class Worm:
 			'body'          : deepcopy(worm1.body),
 			'gene'          : copy(worm1.gene),
 			'color'         : copy(worm1.color),
-			'length'        : len(worm1.body),
 			'ancestor'      : worm1.ancestor,
 			'age'           : 0,
 			'is_dead'       : False,
@@ -222,24 +247,21 @@ class Worm:
 	
 	def mutation(self, mutation_chance, update_var):
 		if self.is_dead == False and int(randrange(0,mutation_chance)) == 0:
-			type = int(randrange(0,6))
+			type = int(randrange(0,4))
 			if type == 0:
-				self.ancestor = self.pretty_print_gene()
+				self.ancestor = self.pretty_print_gene().replace('.','')
 				self.mutation_add_turn_gene()
 				self.new_color()
 			elif type == 1:
-				self.ancestor = self.pretty_print_gene()
+				self.ancestor = self.pretty_print_gene().replace('.','')
 				self.mutation_remove_turn_gene()
 				self.new_color()
 			elif type == 2:
 				self.mutation_add_forward_gene()
 			elif type == 3:
 				self.mutation_remove_forward_gene()
-			elif type == 4:
-				self.mutation_add_body_length()
-			elif type == 5:
-				self.update_tail(*update_var)
-				self.mutation_remove_body_length()
+				
+			self.adjust_body(update_var)
 					
 	def mutation_add_turn_gene(self):
 		turn_type = int(randrange(0,2))
@@ -254,6 +276,17 @@ class Worm:
 				if gene == 'l' or gene == 'r':
 					del self.gene[index]
 					break
+					
+	def mutation_invert_turn_gene(self):
+		#currently unused for certain reasons that involve the CA version.
+		#may get added in the future.
+		for index, gene in enumerate(self.gene):
+			if gene == 'l':
+				self.gene[index] = 'r'
+				break
+			elif gene == 'r':
+				self.gene[index] = 'l'
+				break
 				
 	def mutation_add_forward_gene(self):
 		self.gene.append('.')
@@ -264,26 +297,40 @@ class Worm:
 				if gene == '.':
 					del self.gene[index]
 					break
-	
-	def mutation_add_body_length(self):
-		self.body.append(['south',-10,-10])
-		self.length += 1
-		
-	def mutation_remove_body_length(self):
-		if len(self.body) > 1:
-			self.length -= 1
-			del self.body[-1]
 				
 	def new_color(self):
 		#One of the colors must not go above 200 or else the worm can become white or light grey which are the colors of the background and dying worms.
 		#Red was chosen because the human eye can see more shades red then the other 2 colors.
 		#There are 64 possible colors a worm can be.
-		red   = randrange(0,4) * 65
-		green = randrange(0,4) * 85
-		blue  = randrange(0,4) * 85
+		
+		#multiplied by 3 so that species with the same first 6 turn genes wont have the same color
+		binary = bin(self.turn_gene_to_int() * 3)
+		binary = binary.replace('0b','').zfill(6)
+		
+		red   = int(binary[0:2], 2) * 65
+		green = int(binary[2:4], 2) * 85
+		blue  = int(binary[4:6], 2) * 85
 		
 		self.color = [red, green, blue]
 		
+	def turn_gene_to_int(self):
+		#First converts gene to trinary, then decimal
+		#It does not use binary beacuause the leading 'l's will get ignored
+		trinary = self.pretty_print_gene().replace('.','').replace('l','1').replace('r','2')
+		if len(trinary) != 0:
+			return int(trinary, 3)
+		return 0
+		
+	def adjust_body(self, update_var):
+		if len(self.body) < self.get_length():
+			self.body.append(['south',-10,-10])
+		elif len(self.body) > self.get_length():
+			self.update_tail(*update_var)
+			del self.body[-1]
+			
+	def get_length(self):
+		return len(self.gene) - 1
+			
 	def at_click_location(click_pos, unit):
 		for self in Worm.list:
 			for segment in self.body:
@@ -298,7 +345,7 @@ class Worm:
 				if click_pos[1] - unit > segment[2] + unit:
 					continue
 				else:
-					return 'gene: {} length:{}'.format(self.pretty_print_gene(), self.length)
+					return 'gene: {} length:{}'.format(self.pretty_print_gene(), len(self.gene))
 		return 'Nothing Here'
 		
 	def to_dict():
@@ -307,4 +354,5 @@ class Worm:
 		
 	def debug(self):
 		print()
+		
 	
