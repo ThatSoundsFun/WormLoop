@@ -3,8 +3,8 @@ from worm_class import *
 from game_class import *
 from random import seed
 
-save_file = 'wormloop-save.p'
-log_file  = 'wormloop-log--.txt'
+save_file = 'wormloop-save.json'
+log_file  = 'wormloop-log.txt'
 max_fps = 1
 
 starting_config = {
